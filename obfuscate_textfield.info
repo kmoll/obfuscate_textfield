@@ -1,0 +1,4 @@
+name = Obfuscate Textfield
+description = Provides a text field that hides the value from the user.
+package = Custom
+core = 7.x
