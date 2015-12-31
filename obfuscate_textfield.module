@@ -57,7 +57,8 @@ function theme_obfuscate_textfield_element($variables) {
 
 function obfuscate_textfield_element_process($element, &$form_state, $form) {
   $changing_value = FALSE;
-  if (isset($form_state['triggering_element']['#value']) && $form_state['triggering_element']['#value'] == t('Change')) {
+  if (isset($form_state['triggering_element']['#value']) && $form_state['triggering_element']['#value'] == t('Change')
+    || ($element['#default_value'] !== $element['#value'])) {
     $changing_value = TRUE;
   }
 
@@ -109,7 +110,7 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
     '#default_value' => $value,
   );
 
-  if ($value && empty(form_get_errors())) {
+  if ($value && empty(form_get_errors())  && !$changing_value) {
     $element['obfuscate_textfield_markup'] = array(
       '#type' => 'markup',
       '#markup' => '**********',
@@ -127,12 +128,11 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
   $element['#suffix'] = '</div>';
 
   // If submitted, set the parent value, unset the text value.
-  if (!empty($form_state['input']) && !$changing_value) {
-    $values_element = $element['#extended'] ? $element['value'] : $element;
-    form_set_value($values_element, $value, $form_state);
+  if (!empty($form_state['input'])) {
+    form_set_value($element, $value, $form_state);
     $form_state['input'][$element['#name']] = $value;
 
-    $element['obfuscate_textfield_value']['#access'] = FALSE;
+    //$element['obfuscate_textfield_value']['#access'] = FALSE;
     $element['#tree'] = FALSE;
   }
 
@@ -181,8 +181,14 @@ function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_stat
 }
 
 function obfuscate_textfield_element_pre_render($element) {
-  // If we already have a value, we don't want to show the texfield.
-  if (!empty($element['#value'])) {
+  $changing_value = FALSE;
+  if ($element['#value'] !== $element['#default_value']) {
+    $changing_value = TRUE;
+  }
+
+  // If we already have a value and it didn't change,
+  // we don't want to show the texfield.
+  if (!empty($element['#value']) && !$changing_value) {
     $element['obfuscate_textfield_value']['#access'] = FALSE;
   }
   // If we don't already have a value, don't show the markup.
@@ -195,7 +201,7 @@ function obfuscate_textfield_element_pre_render($element) {
     $element['change_button']['#access'] = FALSE;
   }
 
-  if (form_get_errors() && $element['obfuscate_textfield_value']['#access'] == FALSE) {
+  if (form_get_errors() && $changing_value/*$element['obfuscate_textfield_value']['#access'] == FALSE*/) {
     $element['obfuscate_textfield_value']['#access'] = TRUE;
     $element['#tree'] = TRUE;
 
