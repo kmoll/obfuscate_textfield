@@ -34,6 +34,9 @@ function obfuscate_textfield_theme() {
   );
 }
 
+/**
+ * Theme function for obfuscate_textfield form element.
+ */
 function theme_obfuscate_textfield_element($variables) {
   $element = $variables['element'];
 
@@ -128,17 +131,20 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
   $element['#suffix'] = '</div>';
 
   // If submitted, set the parent value, unset the text value.
+  // In order to be a drop in replacement for a textfield the value has to be
+  // saved as the top level element, not as an array.
   if (!empty($form_state['input'])) {
     form_set_value($element, $value, $form_state);
     $form_state['input'][$element['#name']] = $value;
-
-    //$element['obfuscate_textfield_value']['#access'] = FALSE;
     $element['#tree'] = FALSE;
   }
 
   return $element;
 }
 
+/**
+ * Value callback for obfuscate_textfield form element.
+ */
 function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_state = NULL) {
   $value = '';
 
@@ -180,6 +186,9 @@ function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_stat
   return $value;
 }
 
+/**
+ * Pre-render function for obfuscate_textfield form element.
+ */
 function obfuscate_textfield_element_pre_render($element) {
   $changing_value = FALSE;
   if ($element['#value'] !== $element['#default_value']) {
@@ -201,7 +210,7 @@ function obfuscate_textfield_element_pre_render($element) {
     $element['change_button']['#access'] = FALSE;
   }
 
-  if (form_get_errors() && $changing_value/*$element['obfuscate_textfield_value']['#access'] == FALSE*/) {
+  if (form_get_errors() && $changing_value) {
     $element['obfuscate_textfield_value']['#access'] = TRUE;
     $element['#tree'] = TRUE;
 
@@ -225,6 +234,9 @@ function obfuscate_textfield_element_pre_render($element) {
   return $element;
 }
 
+/**
+ * Validation handler for obfuscate_textfield form element.
+ */
 function obfuscate_textfield_element_validate($element, &$form_state) {
    // Unset the text value so it doesn't get set as a value.
    if (isset($form_state['values']['obfuscate_textfield_value'])) {
@@ -232,6 +244,9 @@ function obfuscate_textfield_element_validate($element, &$form_state) {
    }
 }
 
+/**
+ * Submission handler for obfuscate_textfield form element.
+ */
 function obfuscate_textfield_change_button_submit($form, &$form_state) {
   // Determine if changed button was clicked,
   $parents = $form_state['triggering_element']['#array_parents'];
