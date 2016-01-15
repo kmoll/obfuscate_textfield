@@ -155,9 +155,12 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
 function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_state = NULL) {
   $value = '';
 
-  // Creating a name including parents, to differentiate it from other fields.
-  // In the process function we remote the #tree value so it saves as the top
-  // level name.
+  /*
+   * Creating a name including parents, to differentiate it from other fields.
+   * In the process function we remote the #tree value so it saves as the top
+   * level name.  So we want to make sure this field doesn't collide with
+   * any other fields of this type.
+   */
   $obfuscate_texfield_element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
   // Process any input.
   if ($input !== FALSE && isset($input[$obfuscate_texfield_element_name])) {
