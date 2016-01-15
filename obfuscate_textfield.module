@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ * Module file for obfuscate_textfield form element module.
+ */
 
 /**
  * Implements hook_element_info().
