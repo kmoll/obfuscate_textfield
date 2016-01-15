@@ -2,8 +2,6 @@
 
 /**
  * Implements hook_element_info().
- *
- * The obfuscate_textfield element may be used anywhere in Drupal.
  */
 function obfuscate_textfield_element_info() {
   $types['obfuscate_textfield'] = array(
@@ -49,7 +47,6 @@ function theme_obfuscate_textfield_element($variables) {
   }
   $attributes['class'][] = 'form-obfuscate-textfield';
 
-  // This wrapper is required to apply JS behaviors and CSS styling.
   $output = '';
   $output .= '<div' . drupal_attributes($attributes) . '>';
   $output .= drupal_render_children($element);
@@ -58,6 +55,12 @@ function theme_obfuscate_textfield_element($variables) {
   return $output;
 }
 
+/**
+ * Process callback for obfuscate_textfield form element.
+ *
+ * This will process our form element to add masked markup and change button
+ * if a value exists or show a text field if empty.
+ */
 function obfuscate_textfield_element_process($element, &$form_state, $form) {
   $changing_value = FALSE;
   if (isset($form_state['triggering_element']['#value']) && $form_state['triggering_element']['#value'] == t('Change')
@@ -143,7 +146,7 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
 }
 
 /**
- * Value callback for obfuscate_textfield form element.
+ * The #value_callback for an obfuscate_textfield form element.
  */
 function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_state = NULL) {
   $value = '';
@@ -188,6 +191,9 @@ function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_stat
 
 /**
  * Pre-render function for obfuscate_textfield form element.
+ *
+ * This will hide/show the proper form subelements based on if there is
+ * a value or not, or if we are changing the value.
  */
 function obfuscate_textfield_element_pre_render($element) {
   $changing_value = FALSE;
@@ -211,6 +217,11 @@ function obfuscate_textfield_element_pre_render($element) {
   }
 
   if (form_get_errors() && $changing_value) {
+    /*
+     * If we are changing the value and there is a form error
+     * we need to ensure the textfield is displayed and any other
+     * elements are hidden.
+     */
     $element['obfuscate_textfield_value']['#access'] = TRUE;
     $element['#tree'] = TRUE;
 
@@ -228,6 +239,7 @@ function obfuscate_textfield_element_pre_render($element) {
       $element['obfuscate_textfield_markup']['#access'] = FALSE;
     }
 
+    // Need to add the error class to the sub element.
     $element['obfuscate_textfield_value']['#attributes']['class'][] = 'error';
   }
 
@@ -235,7 +247,12 @@ function obfuscate_textfield_element_pre_render($element) {
 }
 
 /**
- * Validation handler for obfuscate_textfield form element.
+ * #element_validate callback for obfuscate_textfield form element.
+ *
+ * This will unset the obfuscate_textfield_value.  In order for this to be a
+ * drop in replacement for textfied, we need to save the value as the top
+ * level element.  Unless we unset this value, it will also save the value in
+ * a variable with this name (if used in a system_settings_form()).
  */
 function obfuscate_textfield_element_validate($element, &$form_state) {
    // Unset the text value so it doesn't get set as a value.
@@ -246,6 +263,9 @@ function obfuscate_textfield_element_validate($element, &$form_state) {
 
 /**
  * Submission handler for obfuscate_textfield form element.
+ *
+ * This will remove the value from the form element if the user clicks
+ * the change button.
  */
 function obfuscate_textfield_change_button_submit($form, &$form_state) {
   // Determine if changed button was clicked,
