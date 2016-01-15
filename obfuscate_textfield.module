@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ * Module file for obfuscate_texfield form element module.
+ */
 
 /**
  * Implements hook_element_info().
@@ -263,10 +267,10 @@ function obfuscate_textfield_element_pre_render($element) {
  */
 function obfuscate_textfield_element_validate($element, &$form_state) {
   $obfuscate_texfield_element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
-   // Unset the text value so it doesn't get set as a value.
-   if (isset($form_state['values'][$obfuscate_texfield_element_name])) {
-     unset($form_state['values'][$obfuscate_texfield_element_name]);
-   }
+  // Unset the text value so it doesn't get set as a value.
+  if (isset($form_state['values'][$obfuscate_texfield_element_name])) {
+    unset($form_state['values'][$obfuscate_texfield_element_name]);
+  }
 }
 
 /**
