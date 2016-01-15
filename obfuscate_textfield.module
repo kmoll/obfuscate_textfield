@@ -2,8 +2,6 @@
 
 /**
  * Implements hook_element_info().
- *
- * The obfuscate_textfield element may be used anywhere in Drupal.
  */
 function obfuscate_textfield_element_info() {
   $types['obfuscate_textfield'] = array(
@@ -34,6 +32,9 @@ function obfuscate_textfield_theme() {
   );
 }
 
+/**
+ * Theme function for obfuscate_textfield form element.
+ */
 function theme_obfuscate_textfield_element($variables) {
   $element = $variables['element'];
 
@@ -46,7 +47,6 @@ function theme_obfuscate_textfield_element($variables) {
   }
   $attributes['class'][] = 'form-obfuscate-textfield';
 
-  // This wrapper is required to apply JS behaviors and CSS styling.
   $output = '';
   $output .= '<div' . drupal_attributes($attributes) . '>';
   $output .= drupal_render_children($element);
@@ -55,7 +55,20 @@ function theme_obfuscate_textfield_element($variables) {
   return $output;
 }
 
+/**
+ * Process callback for obfuscate_textfield form element.
+ *
+ * This will process our form element to add masked markup and change button
+ * if a value exists or show a text field if empty.
+ */
 function obfuscate_textfield_element_process($element, &$form_state, $form) {
+  $changing_value = FALSE;
+  $change_button_name = implode('_', $element['#parents']) . '_change_button';
+  if (isset($form_state['triggering_element']['#name']) && $form_state['triggering_element']['#name'] == $change_button_name
+    || ($element['#default_value'] !== $element['#value'])) {
+    $changing_value = TRUE;
+  }
+
   // Append the '-text' to the #id so the field label's 'for' attribute
   $original_id = $element['#id'];
   $element['#id'] .= '-text';
@@ -74,6 +87,9 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
     ),
   );
 
+  // Add our validation
+  $element['#element_validate'][] = 'obfuscate_textfield_element_validate';
+
   // Force the progress indicator for the remove button to be either 'none' or
   // 'throbber'.
   $ajax_settings['progress']['type'] = ($element['#progress_indicator'] == 'none') ? 'none' : 'throbber';
@@ -84,16 +100,18 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
     '#type' => 'submit',
     '#value' => t('Change'),
     '#validate' => array(),
-    '#submit' => array('obfuscate_textfield_element_submit'),
+    '#submit' => array('obfuscate_textfield_change_button_submit'),
     '#limit_validation_errors' => array($element['#parents']),
     '#ajax' => $ajax_settings,
     '#weight' => -5,
   );
 
+
   // The text field itself.
-  $element['text'] = array(
+  $element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
+  $element[$element_name] = array(
     '#type' => 'textfield',
-    '#title' => t('Choose a file'),
+    '#title' => t('Enter a value'),
     '#title_display' => 'invisible',
     '#size' => $element['#size'],
     '#theme_wrappers' => array(),
@@ -101,11 +119,17 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
     '#default_value' => $value,
   );
 
-  if ($value) {
-    $element['markup'] = array(
+  $element_markup_name = implode('_', $element['#parents']) . '_obfuscate_textfield_markup';
+  if ($value && empty(form_get_errors())  && !$changing_value) {
+    $element[$element_markup_name] = array(
       '#type' => 'markup',
       '#markup' => '**********',
       '#weight' => -10,
+    );
+
+    $element[$element_name] = array(
+      '#type' => 'value',
+      '#value' => $value,
     );
   }
 
@@ -114,70 +138,145 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
   $element['#suffix'] = '</div>';
 
   // If submitted, set the parent value, unset the text value.
-  if (isset($form_state['input'][$element['#name']]) && is_array($form_state['input'][$element['#name']])) {
-    $element['#tree'] = FALSE;
-    $values_element = $element['#extended'] ? $element['value'] : $element;
-    form_set_value($values_element, $value, $form_state);
+  // In order to be a drop in replacement for a textfield the value has to be
+  // saved as the top level element, not as an array.
+  if (!empty($form_state['input'])) {
+    form_set_value($element, $value, $form_state);
     $form_state['input'][$element['#name']] = $value;
-
-    unset($element['text']);
+    $element['#tree'] = FALSE;
   }
 
   return $element;
 }
 
+/**
+ * The #value_callback for an obfuscate_textfield form element.
+ */
 function obfuscate_textfield_element_value(&$element, $input = FALSE, $form_state = NULL) {
   $value = '';
-  $force_default = FALSE;
 
+  /*
+   * Creating a name including parents, to differentiate it from other fields.
+   * In the process function we remote the #tree value so it saves as the top
+   * level name.  So we want to make sure this field doesn't collide with
+   * any other fields of this type.
+   */
+  $obfuscate_texfield_element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
   // Process any input.
-  if ($input !== FALSE && isset($input['text'])) {
-    return  $input['text'];
+  if ($input !== FALSE && isset($input[$obfuscate_texfield_element_name])) {
+    return  $input[$obfuscate_texfield_element_name];
   }
 
-  // If there is no input or if the default value was requested above, use the
-  // default value.
-  if ($input === FALSE || $force_default) {
-    if ($element['#extended']) {
-      $value = isset($element['#default_value']['value']) ? $element['#default_value']['value'] : '';
+  // If there is no input use the default value.
+  if ($input === FALSE) {
+    if (is_array($element['#default_value']) && isset($element['#default_value'][$obfuscate_texfield_element_name])) {
+      $value = $element['#default_value'][$obfuscate_texfield_element_name];
     }
     else {
-      if (is_array($element['#default_value']) && isset($element['#default_value']['text'])) {
-        $value = $element['#default_value']['text'];
-      }
-      else {
-        $value = $element['#default_value'];
-      }
+      $value = $element['#default_value'];
     }
   }
-
+  elseif (!$input && isset($form_state['input'][$obfuscate_texfield_element_name])) {
+    // If the form was submitted.
+    $value = $form_state['input'][$obfuscate_texfield_element_name];
+  }
+  elseif (isset($form_state['triggering_element']['#value']) && $form_state['triggering_element']['#name'] == implode('_', $element['#parents']) . '_change_button') {
+    // We are changing the field, remove the value.
+    $value = '';
+  }
+  elseif (isset($element['#default_value'])) {
+    // If there is an existing value and its not changed
+    // use the default value.
+    $value = $element['#default_value'];
+  }
 
   return $value;
 }
 
+/**
+ * Pre-render function for obfuscate_textfield form element.
+ *
+ * This will hide/show the proper form subelements based on if there is
+ * a value or not, or if we are changing the value.
+ */
 function obfuscate_textfield_element_pre_render($element) {
-  // If we already have a value, we don't want to show the texfield.
-  if (!empty($element['#value'])) {
-    $element['text']['#access'] = FALSE;
+  $changing_value = FALSE;
+  if ($element['#value'] !== $element['#default_value']) {
+    $changing_value = TRUE;
+  }
+
+  $obfuscate_texfield_element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
+  $obfuscate_textfield_element_markup = implode('_', $element['#parents']) . '_obfuscate_textfield_markup';
+
+  // If we already have a value and it didn't change,
+  // we don't want to show the texfield.
+  if (!empty($element['#value']) && !$changing_value) {
+    $element[$obfuscate_texfield_element_name]['#access'] = FALSE;
   }
   // If we don't already have a value, don't show the markup.
   else {
-    if (isset($element['display_value'])) {
-      $element['display_value']['#access'] = FALSE;
+    $element[$obfuscate_texfield_element_name]['#access'] = TRUE;
+    if (isset($element[$obfuscate_textfield_element_markup])) {
+      $element[$obfuscate_textfield_element_markup]['#access'] = FALSE;
     }
 
     $element['change_button']['#access'] = FALSE;
   }
+
+  if (form_get_errors() && $changing_value) {
+    /*
+     * If we are changing the value and there is a form error
+     * we need to ensure the textfield is displayed and any other
+     * elements are hidden.
+     */
+    $element[$obfuscate_texfield_element_name]['#access'] = TRUE;
+    $element['#tree'] = TRUE;
+
+    $element['change_button']['#access'] = FALSE;
+    if (isset($element[$obfuscate_textfield_element_markup])) {
+      $element[$obfuscate_textfield_element_markup]['#access'] = FALSE;
+    }
+  }
+
+  // If there was an error mark it on the element.
+  if (form_get_error($element)) {
+    // If the error is on this field, don't show the markup and change button.
+    $element['change_button']['#access'] = FALSE;
+    if (isset($element['obfuscate_textfield_markup'])) {
+      $element['obfuscate_textfield_markup']['#access'] = FALSE;
+    }
+
+    // Need to add the error class to the sub element.
+    $element['obfuscate_textfield_value']['#attributes']['class'][] = 'error';
+  }
+
   return $element;
 }
 
+/**
+ * #element_validate callback for obfuscate_textfield form element.
+ *
+ * This will unset the obfuscate_textfield_value.  In order for this to be a
+ * drop in replacement for textfied, we need to save the value as the top
+ * level element.  Unless we unset this value, it will also save the value in
+ * a variable with this name (if used in a system_settings_form()).
+ */
 function obfuscate_textfield_element_validate($element, &$form_state) {
-
+  $obfuscate_texfield_element_name = implode('_', $element['#parents']) . '_obfuscate_textfield_value';
+   // Unset the text value so it doesn't get set as a value.
+   if (isset($form_state['values'][$obfuscate_texfield_element_name])) {
+     unset($form_state['values'][$obfuscate_texfield_element_name]);
+   }
 }
 
-function obfuscate_textfield_element_submit($form, &$form_state) {
+/**
+ * Submission handler for obfuscate_textfield form element.
+ *
+ * This will remove the value from the form element if the user clicks
+ * the change button.
+ */
+function obfuscate_textfield_change_button_submit($form, &$form_state) {
   // Determine if changed button was clicked,
-  // and set $element to the managed_file element that contains that button.
   $parents = $form_state['triggering_element']['#array_parents'];
   $button_key = array_pop($parents);
   $element = drupal_array_get_nested_value($form, $parents);
@@ -192,9 +291,8 @@ function obfuscate_textfield_element_submit($form, &$form_state) {
     // run, and for form building functions that run during the rebuild.
     // $form_state['input'] must be updated so that obfuscate_textfield_element_value()
     // has correct information during the rebuild.
-    $values_element = $element['#extended'] ? $element['value'] : $element;
-    form_set_value($values_element, NULL, $form_state);
-    drupal_array_set_nested_value($form_state['input'], $values_element['#parents'], NULL);
+    form_set_value($element, NULL, $form_state);
+    drupal_array_set_nested_value($form_state['input'], $element['#parents'], NULL);
   }
 
   // Set the form to rebuild so that $form is correctly rebuilt.
