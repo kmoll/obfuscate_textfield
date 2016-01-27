@@ -93,6 +93,7 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
 
   // Add our validation
   $element['#element_validate'][] = 'obfuscate_textfield_element_validate';
+  $element['#attached']['css'][] = drupal_get_path('module', 'obfuscate_textfield') . '/css/obfuscate_textfield.css';
 
   // Force the progress indicator for the remove button to be either 'none' or
   // 'throbber'.
@@ -103,7 +104,7 @@ function obfuscate_textfield_element_process($element, &$form_state, $form) {
     '#name' => implode('_', $element['#parents']) . '_change_button',
     '#type' => 'submit',
     '#value' => t('Change'),
-    '#validate' => array(),
+    '#attributes' => array('class' => array('obfuscate-textfield-change-button')),
     '#submit' => array('obfuscate_textfield_change_button_submit'),
     '#limit_validation_errors' => array($element['#parents']),
     '#ajax' => $ajax_settings,
